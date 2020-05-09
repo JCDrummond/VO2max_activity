@@ -1,0 +1,335 @@
+---
+title: "VO2-max"
+author: "Josh Drummond"
+date: "08/05/2020"
+output:
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Source
+
+The data we will be using for this activity can be found in the vo2-max_data.xlsx file and contains data from 100 participants. It has been sourced from an excellent guide for multiple linear regression on [www.statistics.laerd.com](www.statistics.laerd.com) and consists of the following variables:
+
+1. subject_id: unique subject identification number
+
+2. age: subject age in years
+
+3. weight: subject weight in kilograms
+
+4. heart_rate: subject average heart rate in the last 5 minutes of a 20 minute submaximal cycling test
+
+5. gender: 1 = male, 0 = female
+
+6. vo2_max: VO2max in ml/kg/min recorded from a maximal treadmill test
+
+Each row is one subjects data.
+
+
+## Our Question
+
+This data has been captured to develop a model to estimate VO2max (response variable) based on a persons age, weight, gender and heart rate during a 20 minute submaximal cycling test (explanatory/predictor variables). This would allow future participants to not have to complete a strenuous maximal running treadmill test (which might deter some participants) and rather, to just complete a less strenuous submaximal test.
+
+We can use multiple linear regression to develop this model.
+
+```{r library, include = FALSE}
+library(tidyverse)
+library(broom)
+library(knitr)
+library(naniar)
+library(readxl)
+library(car)
+setwd("/Users/josh/vo2max/VO2max_activity/data")
+```
+
+## Read in the data
+
+Read in and check the structure, head and tail of the data.
+
+```{r read}
+dat <- read_excel("vo2-max_data.xlsx")
+
+str(dat)
+
+head(dat)
+
+tail(dat)
+```
+
+## Data transformation
+
+We will need to change the gender factor from a numeric vector to a factor variable. 
+
+```{r gender, error = TRUE} 
+dat$gender <- as.factor(dat$gender)
+levels(dat$gender) <- c("Female", "Male")
+
+print(dat)
+```
+
+We print the edited variable of 'dat' the Gender column now states Male and Female athletes, replacing the 1 and 0 representation of gender. 
+
+## Exploratory data analysis
+##### *Visualisations*
+
+```{r visualisations-age}
+ggplot(data = dat, aes(x = age, y = vo2_max)) +
+  geom_point(colour = "skyblue") +
+  geom_smooth(method = "lm", colour = "red") +
+  theme_dark() +
+  labs(title = "Age vs VO2 Max",
+       x = "Age of the Athlete",
+       y = "VO2 Max score")
+```
+
+```{r correlation-age}
+cor(x = dat$age, y = dat$vo2_max, method = "pearson")
+```
+####### ***Description of Relationship***
+**Age:** Weak Negative Linear Relationship
+
+```{r visualisations-weight}
+ggplot(data = dat, aes(x = weight, y = vo2_max)) +
+  geom_point(colour = "skyblue") +
+  geom_smooth(method = "lm", colour = "orange") +
+  theme_linedraw()  +
+  labs(title = "Weight vs VO2 Max",
+       x = "Weight of the Athlete",
+       y = "VO2 Max score")
+```
+
+```{r correlation-weight}
+cor(x = dat$weight, y = dat$vo2_max, method = "pearson")
+```
+
+####### ***Description of Relationship***
+**Weight:** Moderate to Weak Negative Linear Relationship
+
+```{r visualisations-heart_rate}
+ggplot(data = dat, aes(x = heart_rate, y = vo2_max)) +
+  geom_point(colour = "black") +
+  geom_smooth(method = "lm", colour = "yellow") +
+  theme_light()  +
+  labs(title = "Heart Rate vs VO2 Max",
+       x = "Heart Rate of the Athlete",
+       y = "VO2 Max score")
+```
+
+```{r correlation-hr}
+cor(x = dat$heart_rate, y = dat$vo2_max, method = "pearson")
+```
+
+####### ***Description of Relationship***
+**Heart Rate:** Weak to Neutral Negative Linear Relationship
+
+```{r visualisations-gender}
+ggplot(data = dat) +
+     geom_boxplot(mapping = aes(x = gender, y = vo2_max, fill = gender)) +
+     scale_fill_manual(values = c("orange", "darkorchid")) +
+  labs(fill = "Gender") +
+  labs(title = "Age vs VO2 Max",
+          x = "Age of the Athlete",
+          y = "VO2 Max score") 
+```
+
+```{r summarising}
+dat %>%
+  group_by(gender) %>%
+  summarise(mean = mean(vo2_max), median(vo2_max), irq = IQR(vo2_max))
+```
+
+####### ***Description of Relationship***
+Males have the greater average and median, however the IQR of their results is larger than Females which indicates that the other factors or Age, Weight and Heart Rate have a potential greater impact on Male VO2 Max scores
+
+## Linear Regression Analysis on Gender
+```{r gender-graphs}
+ggplot(data = dat, aes(x = age, y = vo2_max, colour = gender)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_colour_manual(values = c("orange", "darkorchid")) +
+  labs(colour = "Gender") +
+  labs(title = "Age vs VO2 Max",
+          x = "Age of the Athlete",
+          y = "VO2 Max score") 
+```
+```{r weight-gender}
+ggplot(data = dat, aes(x = age, y = vo2_max, colour = gender)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_colour_manual(values = c("orange", "darkorchid")) +
+  labs(colour = "Gender") +
+  labs(title = "Weight vs VO2 Max",
+       x = "Weight of the Athlete",
+       y = "VO2 Max score")
+```
+```{r heart-rate_graph}
+ggplot(data = dat, aes(x = heart_rate, y = vo2_max, colour = gender)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_colour_manual(values = c("orange", "darkorchid")) +
+  labs(colour = "Gender") +
+  labs(title = "Heart Rate vs VO2 Max",
+       x = "Heart Rate of the Athlete",
+       y = "VO2 Max score")
+```
+
+## Multicollinearity
+
+```{r multicollinearity}
+fit <- lm(vo2_max ~ age + weight + heart_rate + gender, data = dat)
+
+
+pairs(formula = ~ age + weight + heart_rate, data = dat)
+```
+
+
+## Multiple Linear Regression
+
+```{r carplots, error = TRUE}
+tidy(fit, conf.int = TRUE)
+```
+**Interpretation of Linear Regression Model**
+**Question:** 
+*How do you think you would interpret the intercept coefficient now that we have the categorical variable of gender? Does this change the interpretation in anyway? How would you interpret the slope for gender?*
+
+When all the x-axis factors are equal to 0, and the gender is Female (as Male is included in the model) then the predicted value of a Female's VO2 Max score would be 87.83 ml/kg/min. 
+For each single year a person ages, their average VO2 Max score decreases on average by 0.165 ml/kg/min.
+
+For each single kg heavier the athlete is, their VO2 Max score decreases on average on 0.385 ml/kg/min.
+
+When the athlete's Heart Rate increase by 1 BPM, their VO2 Max decreases by 0.118 ml/kg/min. 
+The Males VO2 Max Score on average is 13.209 ml/kg/min higher than a Females score, if all the variables are the same. 
+
+## Independence
+
+```{r independence}
+car::durbinWatsonTest(fit)
+```
+The Durbin Watson Statistic of 1.91 is very close to the recommended value of 2 to indicate no correlation between the residuals. Therefore these residuals have independence of observation.
+
+## Outliers
+
+```{r outliers}
+std_res <- rstandard(fit)
+points <- 1:length(std_res)
+
+ggplot(data = NULL, aes(x = points, y = std_res)) +
+  geom_point() +
+  ylim(c(-4,4)) +
+  geom_hline(yintercept = c(-3,3), colour = "blue", linetype = "dashed")
+
+res_labels <- if_else(abs(std_res) >= 2.5, paste(points), "")
+
+ggplot(data = NULL, aes(x = points, y = std_res)) +
+  geom_point() +
+  geom_text(aes(label = res_labels), nudge_y = 0.3) +
+  ylim(c(-4, 4)) +
+  geom_hline(yintercept = c(-3, 3), colour = "blue", linetype = "dashed")
+```
+
+It would appear that point 28 has the potential to be an outlier as it just goes past 3 standard deviations. Two points of interest in point 41 and 54 that are close to the dashed line. 
+
+## Leverage Points
+```{r hats}
+hats <- hatvalues(fit)
+ggplot(data = NULL, aes(x = points, y = hats)) +
+  geom_point()
+
+
+hat_labels <- if_else(abs(hats) >= .15, paste(points), "")
+
+ggplot(data = NULL, aes(x = points, y = hats)) +
+  geom_point() +
+  geom_text(aes(label = hat_labels), nudge_y = 0.005)
+```
+
+## Influential Points
+```{r cooks}
+cook <- cooks.distance(fit)
+ggplot(data = NULL, aes(x = points, y = cook)) +
+  geom_point()
+
+cook_lables <- if_else(cook >= 0.08, paste(points), "")
+ggplot(data = NULL, aes(x = points, y = cook)) +
+  geom_point() +
+  geom_text(aes(label = cook_lables), nudge_x = 2)
+
+outliers <- c(25, 32, 41, 73)
+filtered_dat <- dat %>%
+  filter(!subject_id %in% outliers)
+
+refit <- lm(vo2_max ~ age + weight + heart_rate + gender, data = filtered_dat)
+tidy(refit, conf.int = TRUE)
+
+summary(refit)
+```
+
+When we remove those 4 key points from the data, the intercept does dramatically increase, and on top of that the slopes of all 3 variables (Age, Weight and Heart Rate) increase in relationship, albeit a negative relationship. 
+
+Reluctant to remove the data points, as they can be an accurate representation of the data gathered and removing them can create a bias in the values, which we don't want.
+An option in future is to undertake a greater sample size to see if the values are a one-off occurence, or if athletes in this area can achieve those VO2 Max scores.
+
+## Homoscedasticity
+
+```{r homoscedasticity}
+res <- residuals(fit)
+fitted <- predict(fit)
+
+ggplot(data = NULL, aes(x = fitted, y = res)) +
+  geom_point(colour = "dodgerblue") +
+  geom_hline(yintercept = 0, colour = "red", linetype = "dashed") +
+  geom_smooth(colour = "magenta")
+```
+
+There appears to be a constant variance across all values of the fitted variables, showing evidence of Homoscedasticity. 
+
+## Normality
+
+```{r normality}
+
+ggplot(data = NULL, aes(sample = res)) +
+  stat_qq() + stat_qq_line()
+```
+
+## Multicollinearity
+
+```{r multi}
+car::vif(fit)
+```
+
+Looking at the Pairs Graphs as well as the Variance Inflation Factor (VIF) there are no early signs of multicollinearity between these variables. 
+
+## Linearity
+
+```{r cars}
+car::avPlots(fit)
+```
+
+There appears that the data is close to failing this assumption, with clusters of points beginning to influence the appearance of the relationship. An option is to transform the predictor, or response variable (or both). 
+
+## Interpretation
+1. *Reconsider our original goal of the analysis. Create an equation to estimate VO2max based on our model coefficients and given values of our explanatory variables.* 
+E(X) = P(X1) + P(X2)... + P(Xn)
+
+Estimated VO2 Max = 87.83 + age x -0.165 + weight x -0.385 + heart rate x -0.118 + gender x 13.209
+
+2. *Using this equation, determine what the estimated VO2max for a person that:
+- is 31 years old
+- is female
+- weighs 68 kgs
+- has an average heart rate of 140 bpm in the last 5 minutes of a 20 minute submaximal cycling test*
+
+```{r sum}
+87.83 + 31 * -0.165 + 68 * -0.385 + 140 * -0.118 + 0 * 13.2
+```
+
+3. *What are the limitations of our model and can we be confident in the estimates it provides us for VO2max?*
+The limitations of our model is that the amount of data taken (100 athletes) limits the depth that the analysis can take.
+Further to that, it is basic raw data, no training background or athlete background that can help identify the condition the athlete was in at the time of the data. If this was taken at the start of the pre-season with no conditioning to get a base, then the estimated VO2 Max of that some athlete at the end of the pre-season will be significantly altered. 
+
+There are factors that we could transform our data to fully agree with the assumptions required, however, I would be trying to find an increased take in data and background before transforming or removing data.
