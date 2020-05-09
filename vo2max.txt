@@ -1,0 +1,15 @@
+The data
+The data we will be using for this activity can be found in the vo2-max_data.xlsx file and contains data from 100 participants. It has been sourced from an excellent guide for multiple linear regression on www.statistics.laerd.com and consists of the following variables:
+
+subject_id: unique subject identification number
+age: subject age in years
+weight: subject weight in kilograms
+heart_rate: subject average heart rate in the last 5 minutes of a 20 minute submaximal cycling test
+gender: 1 = male, 0 = female
+vo2_max: VO2max in ml/kg/min recorded from a maximal treadmill test
+Each row is one subjects data.
+
+Our question
+This data has been captured to develop a model to estimate VO2max (response variable) based on a persons age, weight, gender and heart rate during a 20 minute submaximal cycling test (explanatory/predictor variables). This would allow future participants to not have to complete a strenuous maximal running treadmill test (which might deter some participants) and rather, to just complete a less strenuous submaximal test.
+
+We can use multiple linear regression to develop this model.
